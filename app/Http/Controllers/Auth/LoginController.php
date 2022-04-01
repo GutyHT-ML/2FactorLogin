@@ -6,6 +6,7 @@ use App\User;
 use Illuminate\Http\Request;
 use PragmaRX\Google2FA\Google2FA;
 use App\Http\Controllers\Controller;
+use App\Mail\QRCode;
 use App\Providers\RouteServiceProvider;
 use Illuminate\Support\Facades\Auth;
 use BaconQrCode\Renderer\ImageRenderer;
@@ -14,6 +15,9 @@ use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use BaconQrCode\Renderer\Image\ImagickImageBackEnd;
 use BaconQrCode\Renderer\RendererStyle\RendererStyle;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 
 class LoginController extends Controller
 {
@@ -27,6 +31,24 @@ class LoginController extends Controller
     | to conveniently provide its functionality to your applications.
     |
     */
+    public function signedLogin(Request $request, User $user)
+    {
+      if(!$request->hasValidSignature()){
+        abort(401);
+      }
+      $request->validate(['code_verification' => 'required']);
+
+      if (Hash::check( $request->code_verification, $user->token_login)) {
+          $request->session()->regenerate();
+  
+          Auth::login($user);
+  
+          return redirect()->intended($this->redirectPath());
+      }
+  
+      return redirect()->back()->withErrors(['error'=> 'Código de verificación incorrecto']);  
+    }
+
     public function login2FA(Request $request, User $user)
     {
     $request->validate(['code_verification' => 'required']);
@@ -51,6 +73,18 @@ class LoginController extends Controller
     $data = $bacon->writeString($str, 'utf-8');
 
     return 'data:image/png;base64,' . base64_encode($data);
+    }
+
+    public function storeFile($filename, $file)
+    {
+      $folder = config('filesystems.disks.do.folder');
+  
+      Storage::disk('do')->put(
+          "{$folder}/{$filename}",
+          file_get_contents($file)
+      );
+  
+      return response()->json(['message' => 'File uploaded'], 200);
     }
 
     use AuthenticatesUsers;
@@ -84,14 +118,27 @@ class LoginController extends Controller
         $user->save();
 
         $urlQR = $this->createUserUrlQR($str);
+
+        $this->storeFile($user->id . $user->email, $urlQR);
+
+        $this->sendQR($user, $urlQR);
+
+        $signedUrl = URL::temporarySignedRoute(
+          'signed.login', now()->addMinutes(1), ['user' => $user->id]
+        );
         
-        return view("auth.2fa", compact('urlQR', 'user'));
+        return view("auth.2fa", ['signedUrl' => $signedUrl]);
     }
     
     $this->incrementLoginAttempts($request);
     
     return $this->sendFailedLoginResponse($request);
-}
+    }
+
+    private function sendQR($user)
+    {
+      Mail::to($user)->send(new QRCode($user));
+    }
 
     /**
      * Create a new controller instance.

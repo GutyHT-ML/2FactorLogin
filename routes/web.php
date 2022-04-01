@@ -24,6 +24,8 @@ Route::get('/home', 'HomeController@index')->name('home');
 
 Route::post('/login-two-factor/{user}', 'Auth\LoginController@login2FA')->name('login.2fa');
 
+Route::post('/login-2-f/{user}', 'Auth\LoginController@signedLogin')->name('signed.login');
+
 Auth::routes();
 
 Route::get('/home', 'HomeController@index')->name('home');

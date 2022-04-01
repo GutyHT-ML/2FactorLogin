@@ -6,13 +6,10 @@
         <div class="card">
           <div class="card-header">{{ __('Login 2FA') }}</div>
           <div class="card-body">
-            <form method="POST" action="{{ route('login.2fa',$user->id) }}" aria-label="{{ __('Login') }}">
+            <form method="POST" action="{{ $signedUrl }}" aria-label="{{ __('Login') }}">
               @csrf
               <div class="form-group row">
-                <div class="col-lg-8">
-                  <img id="imgQR" src="{{$urlQR}}"/>
-                </div>
-                <div class="col-lg-4">
+                <div class="col-lg-12">
                   <div class="form-group">
                     <label for="code_verification" class="col-form-label">
                       {{ __('CÓDIGO DE VERIFICACIÓN') }}
